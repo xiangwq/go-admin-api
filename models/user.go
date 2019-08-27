@@ -1,86 +1,90 @@
 package models
 
 import (
-	"errors"
-	"strconv"
+	"fmt"
+	"github.com/astaxie/beego/orm"
 	"time"
 )
 
-var (
-	UserList map[string]*User
-)
+type User struct {
+	Id         int64
+	Name       string `orm:"size(128)"`
+	NickName   string `orm:"size(128)"`
+	AvatorPath string `orm:"size(128)"`
+	IdCardNo   string `orm:"size(128)"`
+	Phone      string `orm:"size(128)"`
+	Password   string `orm:"size(128)"`
+	Email      string `orm:"size(128)"`
+	Sex        int8
+	LoginIp    int
+	Lock       int8
+	Valid      int8
+	Ctime  	   time.Time
+	Utime	   time.Time
+}
+
 
 func init() {
-	UserList = make(map[string]*User)
-	u := User{"user_11111", "astaxie", "11111", Profile{"male", 20, "Singapore", "astaxie@gmail.com"}}
-	UserList["user_11111"] = &u
+	orm.RegisterModel(new(User))
 }
 
-type User struct {
-	Id       string
-	Username string
-	Password string
-	Profile  Profile
+// AddUser insert a new User into database and returns
+// last inserted Id on success.
+func AddUser(m *User) (id int64, err error) {
+	o := orm.NewOrm()
+	id, err = o.Insert(m)
+	return
 }
 
-type Profile struct {
-	Gender  string
-	Age     int
-	Address string
-	Email   string
-}
-
-func AddUser(u User) string {
-	u.Id = "user_" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	UserList[u.Id] = &u
-	return u.Id
-}
-
-func GetUser(uid string) (u *User, err error) {
-	if u, ok := UserList[uid]; ok {
-		return u, nil
+// GetUserById retrieves User by Id. Returns error if
+// Id doesn't exist
+func GetUserById(id int64) (v *User, err error) {
+	o := orm.NewOrm()
+	v = &User{Id: id}
+	if err = o.QueryTable(new(User)).Filter("Id", id).RelatedSel().One(v); err == nil {
+		return v, nil
 	}
-	return nil, errors.New("User not exists")
+	return nil, err
 }
 
-func GetAllUsers() map[string]*User {
-	return UserList
-}
 
-func UpdateUser(uid string, uu *User) (a *User, err error) {
-	if u, ok := UserList[uid]; ok {
-		if uu.Username != "" {
-			u.Username = uu.Username
-		}
-		if uu.Password != "" {
-			u.Password = uu.Password
-		}
-		if uu.Profile.Age != 0 {
-			u.Profile.Age = uu.Profile.Age
-		}
-		if uu.Profile.Address != "" {
-			u.Profile.Address = uu.Profile.Address
-		}
-		if uu.Profile.Gender != "" {
-			u.Profile.Gender = uu.Profile.Gender
-		}
-		if uu.Profile.Email != "" {
-			u.Profile.Email = uu.Profile.Email
-		}
-		return u, nil
+func GetUserByPhone(phone string) (v *User,err error){
+	o := orm.NewOrm()
+	v = &User{Phone: phone}
+	if err = o.QueryTable(new(User)).Filter("phone", phone).One(v); err == nil {
+		return v, nil
 	}
-	return nil, errors.New("User Not Exist")
+	return nil, err
 }
 
-func Login(username, password string) bool {
-	for _, u := range UserList {
-		if u.Username == username && u.Password == password {
-			return true
+
+// UpdateUser updates User by Id and returns error if
+// the record to be updated doesn't exist
+func UpdateUserById(m *User) (err error) {
+	o := orm.NewOrm()
+	v := User{Id: m.Id}
+	// ascertain id exists in the database
+	if err = o.Read(&v); err == nil {
+		var num int64
+		if num, err = o.Update(m); err == nil {
+			fmt.Println("Number of records updated in database:", num)
 		}
 	}
-	return false
+	return
 }
 
-func DeleteUser(uid string) {
-	delete(UserList, uid)
+
+// DeleteUser deletes User by Id and returns error if
+// the record to be deleted doesn't exist
+func DeleteUser(id int64) (err error) {
+	o := orm.NewOrm()
+	v := User{Id: id}
+	// ascertain id exists in the database
+	if err = o.Read(&v); err == nil {
+		var num int64
+		if num, err = o.Delete(&User{Id: id}); err == nil {
+			fmt.Println("Number of records deleted in database:", num)
+		}
+	}
+	return
 }

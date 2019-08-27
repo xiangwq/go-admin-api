@@ -1,119 +1,109 @@
 package controllers
 
 import (
-	"go-admin-api/models"
 	"encoding/json"
-
 	"github.com/astaxie/beego"
+	"github.com/mojocn/base64Captcha"
+	"go-admin-api/middleware"
+	"go-admin-api/models"
 )
 
-// Operations about Users
+type User struct {
+}
+
+type Login struct {
+	Phone 		string `json:"phone"`
+	Password 	string `json:"password"`
+	Idkey		string `json:"idkey"`
+	VerifyCode  string `json:"verify_code"`
+}
+
+//  UserController operations for User
 type UserController struct {
-	beego.Controller
+	BaseController
 }
 
-// @Title CreateUser
-// @Description create users
-// @Param	body		body 	models.User	true		"body for user content"
-// @Success 200 {int} models.User.Id
-// @Failure 403 body is empty
-// @router / [post]
-func (u *UserController) Post() {
-	var user models.User
-	json.Unmarshal(u.Ctx.Input.RequestBody, &user)
-	uid := models.AddUser(user)
-	u.Data["json"] = map[string]string{"uid": uid}
-	u.ServeJSON()
+func (this *UserController) Login() {
+	var input Login
+	var tokenInfo map[string]interface{}
+	tokenInfo =make(map[string]interface{})
+	json.Unmarshal(this.Ctx.Input.RequestBody, &input)
+	captchaOk := middleware.VerifyCaptchaCode(input.Idkey,input.VerifyCode)
+	if !captchaOk {
+		this.apiError(MSG_ERR,"验证码错误",nil)
+	}
+	user, err := models.GetUserByPhone(input.Phone)
+	if err != nil{
+		this.apiError(MSG_ERR,"账号或密码错误",nil)
+	}
+	password := middleware.PassEncrypt(input.Password,beego.AppConfig.String("loginsalt"))
+	if(user.Password != password){
+		this.apiError(MSG_ERR,"账号或密码错误",nil)
+	}
+	tokenInfo["id"] = user.Id
+	tokenInfo["name"] = user.Name
+	tokenInfo["nickName"] = user.NickName
+	token := middleware.JWTGenToken(beego.AppConfig.String("jwtkey"),tokenInfo)
+	this.apiSuc(token)
 }
 
-// @Title GetAll
-// @Description get all Users
-// @Success 200 {object} models.User
-// @router / [get]
-func (u *UserController) GetAll() {
-	users := models.GetAllUsers()
-	u.Data["json"] = users
-	u.ServeJSON()
-}
-
-// @Title Get
-// @Description get user by uid
-// @Param	uid		path 	string	true		"The key for staticblock"
-// @Success 200 {object} models.User
-// @Failure 403 :uid is empty
-// @router /:uid [get]
-func (u *UserController) Get() {
-	uid := u.GetString(":uid")
-	if uid != "" {
-		user, err := models.GetUser(uid)
-		if err != nil {
-			u.Data["json"] = err.Error()
-		} else {
-			u.Data["json"] = user
+func (this *UserController) GetCaptcha() {
+	var captchaData map[string]interface{}
+	var input middleware.Captcha
+	var config middleware.ConfigCaptcha
+	json.Unmarshal(this.Ctx.Input.RequestBody, &input)
+	switch input.CaptchaType {
+	case middleware.Audio:
+		config.Id = input.Id
+		config.CaptchaType = input.CaptchaType
+		config.ConfigAudio = base64Captcha.ConfigAudio{
+			CaptchaLen: 5,
+			Language:   "zh",
+		}
+	case middleware.Digit:
+		config.Id = input.Id
+		config.CaptchaType = input.CaptchaType
+		config.ConfigDigit = base64Captcha.ConfigDigit{
+			Height:     47,
+			Width:      160,
+			MaxSkew:    0.7,
+			DotCount:   80,
+			CaptchaLen: 5,
+		}
+	case middleware.Character:
+		config.Id = input.Id
+		config.CaptchaType = input.CaptchaType
+		config.ConfigCharacter = base64Captcha.ConfigCharacter{
+			Height:             47,
+			Width:              160,
+			//const CaptchaModeNumber:数字,CaptchaModeAlphabet:字母,CaptchaModeArithmetic:算术,CaptchaModeNumberAlphabet:数字字母混合.
+			Mode:               base64Captcha.CaptchaModeNumber,
+			ComplexOfNoiseText: base64Captcha.CaptchaComplexLower,
+			ComplexOfNoiseDot:  base64Captcha.CaptchaComplexLower,
+			IsShowHollowLine:   false,
+			IsShowNoiseDot:     false,
+			IsShowNoiseText:    false,
+			IsShowSlimeLine:    false,
+			IsShowSineLine:     false,
+			CaptchaLen:         5,
 		}
 	}
-	u.ServeJSON()
+	idkey, data := middleware.GenerateCaptcha(config)
+
+	captchaData = make(map[string]interface{})
+	captchaData["idkey"] = idkey
+	captchaData["data"] = data
+	this.apiSuc(captchaData)
 }
 
-// @Title Update
-// @Description update the user
-// @Param	uid		path 	string	true		"The uid you want to update"
-// @Param	body		body 	models.User	true		"body for user content"
-// @Success 200 {object} models.User
-// @Failure 403 :uid is not int
-// @router /:uid [put]
-func (u *UserController) Put() {
-	uid := u.GetString(":uid")
-	if uid != "" {
-		var user models.User
-		json.Unmarshal(u.Ctx.Input.RequestBody, &user)
-		uu, err := models.UpdateUser(uid, &user)
-		if err != nil {
-			u.Data["json"] = err.Error()
-		} else {
-			u.Data["json"] = uu
-		}
+func (this *UserController) Info(){
+	var userInfo map[string]interface{}
+	user, err := models.GetUserById(this.userId)
+	if err != nil{
+		this.apiError(MSG_NO_LOGIN,"未登录,请线登录",nil)
 	}
-	u.ServeJSON()
+	userInfo = make(map[string]interface{})
+	userInfo["name"] = user.Name
+	userInfo["avator"] = user.AvatorPath
+	this.apiSuc(userInfo)
 }
-
-// @Title Delete
-// @Description delete the user
-// @Param	uid		path 	string	true		"The uid you want to delete"
-// @Success 200 {string} delete success!
-// @Failure 403 uid is empty
-// @router /:uid [delete]
-func (u *UserController) Delete() {
-	uid := u.GetString(":uid")
-	models.DeleteUser(uid)
-	u.Data["json"] = "delete success!"
-	u.ServeJSON()
-}
-
-// @Title Login
-// @Description Logs user into the system
-// @Param	username		query 	string	true		"The username for login"
-// @Param	password		query 	string	true		"The password for login"
-// @Success 200 {string} login success
-// @Failure 403 user not exist
-// @router /login [get]
-func (u *UserController) Login() {
-	username := u.GetString("username")
-	password := u.GetString("password")
-	if models.Login(username, password) {
-		u.Data["json"] = "login success"
-	} else {
-		u.Data["json"] = "user not exist"
-	}
-	u.ServeJSON()
-}
-
-// @Title logout
-// @Description Logs out current logged in user session
-// @Success 200 {string} logout success
-// @router /logout [get]
-func (u *UserController) Logout() {
-	u.Data["json"] = "logout success"
-	u.ServeJSON()
-}
-

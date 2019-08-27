@@ -1,15 +1,13 @@
 package main
 
 import (
-	_ "go-admin-api/routers"
-
 	"github.com/astaxie/beego"
+	_ "github.com/go-sql-driver/mysql"
+	"go-admin-api/models"
+	_ "go-admin-api/routers"
 )
 
 func main() {
-	if beego.BConfig.RunMode == "dev" {
-		beego.BConfig.WebConfig.DirectoryIndex = true
-		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
-	}
+	models.Init()
 	beego.Run()
 }
