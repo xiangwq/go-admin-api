@@ -9,5 +9,9 @@ import (
 
 func main() {
 	models.Init()
+	err := models.RegisterRbac()
+	if err != nil {
+		panic(err)
+	}
 	beego.Run()
 }
