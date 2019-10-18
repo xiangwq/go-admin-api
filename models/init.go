@@ -9,8 +9,7 @@ import (
 )
 
 const (
-	VALID  = 1
-	ACTIVE = 1
+	VALID = 0
 )
 
 func Init() {
@@ -42,13 +41,13 @@ func MysqlDsn() string {
 
 func RegisterRbac() error {
 	Rbac := middleware.RbacNew()
-	var roles []Role
-	var roleRights []RoleRight
-	var rights []Right
+	var roles []AdminRole
+	var rolePermissions []AdminRolePermission
+	var permissions []AdminPermission
 
-	var mapRights map[int]Right
+	var mapPermissions map[int]AdminPermission
 	o := orm.NewOrm()
-	_, roleErr := o.QueryTable(new(Role)).Filter("valid", VALID).Filter("active", ACTIVE).Limit(-1).All(&roles)
+	_, roleErr := o.QueryTable(new(AdminRole)).Filter("valid", VALID).Limit(-1).All(&roles)
 
 	if roleErr != nil {
 		return errors.New("query table Role error:", roleErr)
@@ -57,26 +56,26 @@ func RegisterRbac() error {
 		stdRole := middleware.StdRoleNew()
 		Rbac.Add(int(v.Id), stdRole)
 	}
-	_, errRoleRight := o.QueryTable(new(RoleRight)).Filter("valid", VALID).Filter("active", ACTIVE).Limit(-1).All(&roleRights)
-	if errRoleRight != nil {
-		return errors.New("query table RoleRight error:", errRoleRight)
+	_, errRolePermission := o.QueryTable(new(AdminRolePermission)).Filter("valid", VALID).Limit(-1).All(&rolePermissions)
+	if errRolePermission != nil {
+		return errors.New("query table RoleRight error:", errRolePermission)
 	}
-	_, errRight := o.QueryTable(new(Right)).Filter("valid", VALID).Filter("active", ACTIVE).Limit(-1).All(&rights)
+	_, errRight := o.QueryTable(new(AdminPermission)).Filter("valid", VALID).Filter("type", Interface).Limit(-1).All(&permissions)
 	if errRight != nil {
 		return errors.New("query table Right error:", errRight)
 	}
-	mapRights = make(map[int]Right)
-	for _, v := range rights {
-		mapRights[int(v.Id)] = v
+	mapPermissions = make(map[int]AdminPermission)
+	for _, v := range mapPermissions {
+		mapPermissions[int(v.Id)] = v
 	}
 
-	for _, v := range roleRights {
+	for _, v := range rolePermissions {
 		role, err := Rbac.Get(int(v.RoleId))
 		if err != nil {
 			return errors.New("rbac get role error", err)
 		}
-		rightId := int(int(v.RightId))
-		role.Add(rightId, middleware.StdRuleNew(mapRights[rightId].Object, mapRights[rightId].Action))
+		rightId := int(int(v.PermissionId))
+		role.Add(rightId, middleware.StdRuleNew(mapPermissions[rightId].Url, mapPermissions[rightId].Method))
 	}
 	return nil
 }

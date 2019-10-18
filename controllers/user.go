@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/mojocn/base64Captcha"
 	"go-admin-api/middleware"
@@ -33,10 +34,12 @@ func (this *UserController) Login() {
 		this.apiError(MSG_ERR, "验证码错误", nil)
 	}
 	user, err := models.GetUserByPhone(input.Phone)
+	fmt.Println(err)
 	if err != nil {
 		this.apiError(MSG_ERR, "账号或密码错误", nil)
 	}
 	password := middleware.PassEncrypt(input.Password, beego.AppConfig.String("loginsalt"))
+	fmt.Println(password)
 	if user.Password != password {
 		this.apiError(MSG_ERR, "账号或密码错误", nil)
 	}

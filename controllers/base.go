@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/astaxie/beego"
 	"github.com/dgrijalva/jwt-go"
 	"go-admin-api/middleware"
@@ -27,7 +28,7 @@ type BaseController struct {
 	userName       string
 	nickName       string
 	roleIds        []int
-	user           *models.User
+	user           *models.AdminUser
 }
 
 //output result struct
@@ -76,6 +77,7 @@ func (this *BaseController) authorityAuthentication() bool {
 		roleIds = append(roleIds, int(v.(float64)))
 	}
 	this.roleIds = roleIds
+	fmt.Println(roleIds)
 	for _, v := range roleIds {
 		// 对超级管理员不进行权限验证
 		admin, _ := beego.AppConfig.Int("admin")
